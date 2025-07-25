@@ -97,6 +97,9 @@ async def async_setup_entry(
     coordinator = AuxCloudDataUpdateCoordinator(hass, client)
     await coordinator.async_refresh()
 
+    # Store coordinator in entry data for other platforms to use
+    entry_data["coordinator"] = coordinator
+
     try:
         devices = await client.get_devices()
         entities = []
@@ -134,7 +137,7 @@ class AuxCloudDataUpdateCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name="AuxCloud",
-            update_interval=timedelta(minutes=2),  # Fallback polling interval
+            update_interval=timedelta(minutes=10),  # Fallback polling interval
         )
 
     async def _handle_websocket_message(self, message: dict) -> None:

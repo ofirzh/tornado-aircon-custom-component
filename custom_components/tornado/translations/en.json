@@ -33,6 +33,29 @@
           }
         }
       }
+    },
+    "sensor": {
+      "tornado_timer": {
+        "name": "Timer",
+        "state_attributes": {
+          "timer_active": "Timer Active",
+          "timer_duration": "Timer Duration",
+          "timer_start_time": "Timer Start Time",
+          "timer_end_time": "Timer End Time",
+          "target_action": "Target Action",
+          "sleep_mode_active": "Sleep Mode Active"
+        }
+      }
+    },
+    "number": {
+      "tornado_timer_duration": {
+        "name": "Timer Duration"
+      }
+    },
+    "switch": {
+      "tornado_sleep_mode": {
+        "name": "Sleep Mode"
+      }
     }
   }
 }

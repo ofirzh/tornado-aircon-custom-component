@@ -1,0 +1,36 @@
+set_timer:
+  name: Set Timer
+  description: Set a timer for the Tornado AC unit
+  target:
+    entity:
+      integration: tornado
+      domain: sensor
+  fields:
+    duration:
+      name: Duration
+      description: Timer duration in minutes (0 to cancel)
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 480
+          step: 1
+          unit_of_measurement: minutes
+    action:
+      name: Action
+      description: What to do when timer expires
+      required: false
+      default: "turn_off"
+      selector:
+        select:
+          options:
+            - "turn_off"
+            - "sleep_mode"
+
+cancel_timer:
+  name: Cancel Timer
+  description: Cancel the active timer for the Tornado AC unit
+  target:
+    entity:
+      integration: tornado
+      domain: sensor

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE]
+PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR, Platform.NUMBER, Platform.SWITCH]
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -50,6 +50,39 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id]["client"] = client
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    
+    # Register services
+    async def handle_set_timer(call):
+        """Handle set timer service call."""
+        entity_id = call.data.get("entity_id")
+        duration = call.data.get("duration", 0)
+        action = call.data.get("action", "turn_off")
+        
+        # Find the timer sensor entity
+        entity_registry = hass.helpers.entity_registry.async_get(hass)
+        entity_entry = entity_registry.async_get(entity_id)
+        
+        if entity_entry and entity_entry.platform == DOMAIN:
+            entity = hass.data.get("entity_components", {}).get("sensor", {}).get(entity_id)
+            if hasattr(entity, 'async_set_timer'):
+                await entity.async_set_timer(duration, action)
+    
+    async def handle_cancel_timer(call):
+        """Handle cancel timer service call."""
+        entity_id = call.data.get("entity_id")
+        
+        # Find the timer sensor entity
+        entity_registry = hass.helpers.entity_registry.async_get(hass)
+        entity_entry = entity_registry.async_get(entity_id)
+        
+        if entity_entry and entity_entry.platform == DOMAIN:
+            entity = hass.data.get("entity_components", {}).get("sensor", {}).get(entity_id)
+            if hasattr(entity, 'async_cancel_timer'):
+                await entity.async_cancel_timer()
+    
+    hass.services.async_register(DOMAIN, "set_timer", handle_set_timer)
+    hass.services.async_register(DOMAIN, "cancel_timer", handle_cancel_timer)
+    
     return True
 
 
