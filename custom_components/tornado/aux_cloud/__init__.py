@@ -20,6 +20,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from .aux_cloud_ws import AuxCloudWebSocket
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -166,6 +168,7 @@ class AuxCloudAPI:
         self.email = email
         self.password = password
         self.session = session
+        self.region = region
         # If session is provided externally, we don't own it
         self._session_owner = session is None
         self.data: dict[str, Any] = {}
@@ -208,7 +211,6 @@ class AuxCloudAPI:
             if cls._shared_session and not cls._shared_session.closed:
                 session = cls._shared_session
                 cls._shared_session = None
-
         if session:
             await session.close()
 
@@ -838,3 +840,29 @@ class AuxCloudAPI:
         except Exception:
             _LOGGER.exception("Error refreshing data")
             raise
+    
+    async def initialize_websocket(self):
+        """
+        Initialize the WebSocket connection to receive real-time updates.
+        """
+        # Check if we're logged in
+        if not hasattr(self, "loginsession") or not self.loginsession:
+            _LOGGER.debug("No login session found, attempting to login")
+            await self.login()
+
+        self.ws_api = AuxCloudWebSocket(
+            region=self.region,
+            headers=self._get_headers(CompanyId=COMPANY_ID, Origin=self.url),
+            loginsession=self.loginsession,
+            userid=self.userid,
+        )
+        await self.ws_api.initialize_websocket()
+
+        timeout = 10  # Timeout in seconds
+        start_time = time.time()
+        while not self.ws_api.api_initialized:
+            if time.time() - start_time > timeout:
+                raise TimeoutError("WebSocket API initialization timed out.")
+
+            _LOGGER.debug("Waiting for WebSocket API to initialize...")
+            await asyncio.sleep(1)

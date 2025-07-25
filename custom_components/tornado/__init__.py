@@ -39,6 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await client.login()
+        await client.initialize_websocket()
         await client.refresh()
     except Exception:
         await client.cleanup()

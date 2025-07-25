@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -90,6 +92,7 @@ async def async_setup_entry(
     if not hasattr(client, "loginsession") or not client.loginsession:
         _LOGGER.info("Initial login for AuxCloud client")
         await client.login()
+        await client.initialize_websocket()
 
     coordinator = AuxCloudDataUpdateCoordinator(hass, client)
     await coordinator.async_refresh()
@@ -124,12 +127,50 @@ class AuxCloudDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, api: AuxCloudAPI) -> None:
         """Initialize the coordinator."""
         self.api = api
+        _LOGGER.info("Adding websocket listener that triggers coordinator update")
+        # Add websocket listener that triggers coordinator update
+        self.api.ws_api.add_websocket_listener(self._handle_websocket_message)
         super().__init__(
             hass,
             _LOGGER,
             name="AuxCloud",
-            update_interval=timedelta(minutes=1),
+            update_interval=timedelta(minutes=2),  # Fallback polling interval
         )
+
+    async def _handle_websocket_message(self, message: dict) -> None:
+        """Handle incoming websocket message and trigger coordinator update."""
+        _LOGGER.debug("Received websocket message: %s", message)
+        if 'data' in message and 'data' in message['data'] and "endpointId" in message['data']:
+            # Schedule an async update from the websocket callback
+            self.hass.async_create_task(self._async_handle_websocket_update(message['data']))
+
+    async def _async_handle_websocket_update(self, message: dict) -> None:
+        """Process websocket message and update coordinator data."""
+        try:
+            _LOGGER.debug(
+            "_async_handle_websocket_update with message: %s",
+            message,
+            )
+            if "endpointId" in message and "data" in message:
+                device_id = message["endpointId"]
+                params = json.loads(base64.b64decode(message['data']).decode('utf-8'))
+                # Update the specific device in coordinator data
+                if self.data and device_id in self.data:
+                    # Ensure params exists
+                    if "params" not in self.data[device_id]:
+                        self.data[device_id]["params"] = {}
+                    
+                    # Update only the received parameters
+                    self.data[device_id]["params"].update(params)
+
+                    # Trigger update for all listening entities
+                    self.async_update_listeners()
+                    _LOGGER.debug("Updated device %s from websocket", device_id)
+
+        except Exception as err:
+            _LOGGER.exception("Error handling websocket update: %s", err)
+            error_msg = f"Error fetching data: {err}"
+            raise UpdateFailed(error_msg) from err
 
     async def _async_update_data(self) -> dict:
         """Fetch data from AuxCloud."""
